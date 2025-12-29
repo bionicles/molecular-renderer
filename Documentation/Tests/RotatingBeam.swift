@@ -232,14 +232,14 @@ func createApplication() -> Application {
   var deviceDesc = DeviceDescriptor()
   deviceDesc.deviceID = Device.fastestDeviceID
   let device = Device(descriptor: deviceDesc)
-  
+
   // Set up the display.
   var displayDesc = DisplayDescriptor()
   displayDesc.device = device
   displayDesc.frameBufferSize = SIMD2<Int>(1080, 1080)
   displayDesc.monitorID = device.fastestMonitorID
   let display = Display(descriptor: displayDesc)
-  
+
   // Set up the application.
   var applicationDesc = ApplicationDescriptor()
   applicationDesc.device = device
@@ -254,12 +254,12 @@ func createApplication() -> Application {
   // for ray tracing is quite low. That's probably why the test didn't cause
   // performance issues.
   applicationDesc.upscaleFactor = 1
-  
+
   applicationDesc.addressSpaceSize = 4_000_000
   applicationDesc.voxelAllocationSize = 500_000_000
   applicationDesc.worldDimension = paddedWorldDimension
   let application = Application(descriptor: applicationDesc)
-  
+
   return application
 }
 let application = createApplication()
@@ -287,7 +287,7 @@ func addRotatedBeam(frameID: Int) {
 application.run {
   addRotatedBeam(frameID: application.clock.frames)
   application.camera.position = SIMD3(0, 0, (actualWorldDimension / 2) - 8)
-  
+
   let image = application.render()
   application.present(image: image)
 }
