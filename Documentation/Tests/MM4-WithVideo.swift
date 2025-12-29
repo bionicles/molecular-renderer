@@ -1,82 +1,42 @@
 import Foundation
 import GIFModule
 import HDL
-import MM4
 import MolecularRenderer
 import QuaternionModule
 
 // MARK: - User-Facing Options
 
 let renderingOffline: Bool = true
-let frameCount: Int = 60 * 3  // 3 seconds at 60 FPS
-let gifFrameSkipRate: Int = 2  // Save every 2nd frame for 30 FPS GIF
+let frameCount: Int = 60 * 5  // 5 seconds at 60 FPS (longer animation)
+let gifFrameSkipRate: Int = 3  // Save every 3rd frame for 20 FPS GIF
 
-// MARK: - Compile Structure
+// MARK: - Create Sample Molecules
 
-func passivate(topology: inout Topology) {
-  func createHydrogen(
-    atomID: UInt32,
-    orbital: SIMD3<Float>
-  ) -> Atom {
-    let atom = topology.atoms[Int(atomID)]
-
-    var bondLength = atom.element.covalentRadius
-    bondLength += Element.hydrogen.covalentRadius
-
-    let position = atom.position + bondLength * orbital
-    return Atom(position: position, element: .hydrogen)
-  }
-
-  let orbitalLists = topology.nonbondingOrbitals()
-
-  var insertedAtoms: [Atom] = []
-  var insertedBonds: [SIMD2<UInt32>] = []
-  for atomID in topology.atoms.indices {
-    let orbitalList = orbitalLists[atomID]
-    for orbital in orbitalList {
-      let hydrogen = createHydrogen(
-        atomID: UInt32(atomID),
-        orbital: orbital)
-      let hydrogenID = topology.atoms.count + insertedAtoms.count
-      insertedAtoms.append(hydrogen)
-
-      let bond = SIMD2(
-        UInt32(atomID),
-        UInt32(hydrogenID))
-      insertedBonds.append(bond)
-    }
-  }
-  topology.atoms += insertedAtoms
-  topology.bonds += insertedBonds
+func createIsopropanol() -> [SIMD4<Float>] {
+  return [
+    Atom(position: SIMD3( 2.0186, -0.2175,  0.7985) * 0.1, element: .hydrogen),
+    Atom(position: SIMD3( 1.4201, -0.2502, -0.1210) * 0.1, element: .carbon),
+    Atom(position: SIMD3( 1.6783,  0.6389, -0.7114) * 0.1, element: .hydrogen),
+    Atom(position: SIMD3( 1.7345, -1.1325, -0.6927) * 0.1, element: .hydrogen),
+    Atom(position: SIMD3(-0.0726, -0.3145,  0.1833) * 0.1, element: .carbon),
+    Atom(position: SIMD3(-0.2926, -1.2317,  0.7838) * 0.1, element: .hydrogen),
+    Atom(position: SIMD3(-0.3758,  0.8195,  0.9774) * 0.1, element: .oxygen),
+    Atom(position: SIMD3(-1.3159,  0.8236,  1.0972) * 0.1, element: .hydrogen),
+    Atom(position: SIMD3(-0.8901, -0.3435, -1.1071) * 0.1, element: .carbon),
+    Atom(position: SIMD3(-0.7278,  0.5578, -1.7131) * 0.1, element: .hydrogen),
+    Atom(position: SIMD3(-0.6126, -1.2088, -1.7220) * 0.1, element: .hydrogen),
+    Atom(position: SIMD3(-1.9673, -0.4150, -0.9062) * 0.1, element: .hydrogen),
+  ]
 }
 
-func createTopology() -> Topology {
-  let lattice = Lattice<Cubic> { h, k, l in
-    Bounds { 4 * (h + k + l) }
-    Material { .checkerboard(.carbon, .silicon) }
-  }
-  var reconstruction = Reconstruction()
-  reconstruction.atoms = lattice.atoms
-  reconstruction.material = .checkerboard(.silicon, .carbon)
-  var topology = reconstruction.compile()
-  passivate(topology: &topology)
-
-  // Create a force field for dynamics
-  var forceFieldDesc = MM4ForceFieldDescriptor()
-  forceFieldDesc.atomicNumbers = topology.atoms.map(\.atomicNumber)
-  forceFieldDesc.bonds = topology.bonds
-  let forceField = MM4ForceField(descriptor: forceFieldDesc)
-
-  // Minimize the structure
-  forceField.positions = topology.atoms.map(\.position)
-  forceField.minimize(tolerance: 1.0)
-
-  // Update topology with minimized positions
-  for i in topology.atoms.indices {
-    topology.atoms[i].position = forceField.positions[i]
-  }
-
-  return topology
+func createSilane() -> [SIMD4<Float>] {
+  return [
+    Atom(position: SIMD3( 0.0000,  0.0000,  0.0000) * 0.1, element: .silicon),
+    Atom(position: SIMD3( 0.8544,  0.8544,  0.8544) * 0.1, element: .hydrogen),
+    Atom(position: SIMD3(-0.8544, -0.8544,  0.8544) * 0.1, element: .hydrogen),
+    Atom(position: SIMD3(-0.8544,  0.8544, -0.8544) * 0.1, element: .hydrogen),
+    Atom(position: SIMD3( 0.8544, -0.8544, -0.8544) * 0.1, element: .hydrogen),
+  ]
 }
 
 // MARK: - Rendering Setup
@@ -90,13 +50,19 @@ func createApplication() -> Application {
   var displayDesc = DisplayDescriptor()
   displayDesc.device = device
   displayDesc.frameBufferSize = SIMD2<Int>(1440, 1080)
-  displayDesc.monitorID = device.fastestMonitorID
+  if !renderingOffline {
+    displayDesc.monitorID = device.fastestMonitorID
+  }
   let display = Display(descriptor: displayDesc)
 
   var applicationDesc = ApplicationDescriptor()
   applicationDesc.device = device
   applicationDesc.display = display
-  applicationDesc.upscaleFactor = 3
+  if renderingOffline {
+    applicationDesc.upscaleFactor = 1
+  } else {
+    applicationDesc.upscaleFactor = 3
+  }
 
   applicationDesc.addressSpaceSize = 4_000_000
   applicationDesc.voxelAllocationSize = 500_000_000
@@ -107,76 +73,113 @@ func createApplication() -> Application {
 }
 
 let application = createApplication()
-let topology = createTopology()
 
-// Set up force field for dynamics
-var forceFieldDesc = MM4ForceFieldDescriptor()
-forceFieldDesc.atomicNumbers = topology.atoms.map(\.atomicNumber)
-forceFieldDesc.bonds = topology.bonds
-let forceField = MM4ForceField(descriptor: forceFieldDesc)
-forceField.positions = topology.atoms.map(\.position)
-
-// Initialize velocities for room temperature
-forceField.velocities = (0..<topology.atoms.count).map { _ in
-  SIMD3<Float>(repeating: 0) // Start with zero velocity, will thermalize
+// State variable to facilitate atom transitions for the animation.
+enum AnimationState {
+  case isopropanol
+  case silane
 }
-
-// Thermalize to 300K
-let boltzmann = Float(1.380649e-23)
-let temperature: Float = 300
-let targetKE = 1.5 * boltzmann * temperature * Float(topology.atoms.count)
-forceField.thermalize(targetKE: targetKE)
+var animationState: AnimationState?
 
 // MARK: - GIF Recording Setup
 
-var gif = GIF()
-var gifImage = GIFModule.Image(width: 1440 * 3, height: 1080 * 3)
+let gifWidth = renderingOffline ? 1440 : 1440 * 3
+let gifHeight = renderingOffline ? 1080 : 1080 * 3
+
+var gif = GIF(
+  width: gifWidth,
+  height: gifHeight,
+  loopCount: 0)
+var gifImage = GIFModule.Image(width: gifWidth, height: gifHeight)
+
+// Global time tracking for offline rendering
+var currentTime: Float = 0
 
 // MARK: - Simulation Loop
 
 @MainActor
 func modifyAtoms() {
-  // Run dynamics for 1 fs per frame
-  forceField.simulate(timeStep: 1e-15, steps: 1)
+  // Gentle molecule rotation (0.1 Hz)
+  let angleDegrees = 0.1 * currentTime * 360
+  let rotation = Quaternion<Float>(
+    angle: Float.pi / 180 * angleDegrees,
+    axis: SIMD3(0, 1, 0))
 
-  // Update application atoms
-  application.atoms = forceField.positions.enumerated().map { (i, position) in
-    Atom(position: position, element: topology.atoms[i].element)
+  let roundedDownTime = Int((currentTime / 3).rounded(.down))
+  if roundedDownTime % 2 == 0 {
+    let isopropanol = createIsopropanol()
+    if animationState == .silane {
+      for atomID in 12..<17 {
+        application.atoms[atomID] = nil
+      }
+    }
+
+    animationState = .isopropanol
+    for i in isopropanol.indices {
+      let atomID = 0 + i
+      var atom = isopropanol[i]
+      atom.position = rotation.act(on: atom.position)
+      application.atoms[atomID] = atom
+    }
+  } else {
+    let silane = createSilane()
+    if animationState == .isopropanol {
+      for atomID in 0..<12 {
+        application.atoms[atomID] = nil
+      }
+    }
+
+    animationState = .silane
+    for i in silane.indices {
+      let atomID = 12 + i
+      var atom = silane[i]
+      atom.position = rotation.act(on: atom.position)
+      application.atoms[atomID] = atom
+    }
   }
 }
 
 @MainActor
 func modifyCamera() {
-  let time = Float(application.frameID) / 60.0  // seconds
-
-  // Slow rotation around the molecule
-  let angle = time * 0.1 * 2 * .pi  // Full rotation every ~63 seconds
-  let radius: Float = 3.0  // nm
-
-  application.camera.position = SIMD3<Float>(
-    radius * cos(angle),
-    radius * sin(angle),
-    1.0
-  )
+  // Fixed camera position - place the camera farther back since atoms are larger
+  application.camera.position = SIMD3<Float>(0, 0, 2.0)
 
   application.camera.basis.0 = SIMD3(1, 0, 0)
   application.camera.basis.1 = SIMD3(0, 1, 0)
   application.camera.basis.2 = SIMD3(0, 0, 1)
-  application.camera.fovAngleVertical = .pi / 180 * 60
+  application.camera.fovAngleVertical = Float.pi / 180 * 40
 }
 
 // MARK: - Main Loop
 
-application.run {
+// This test only supports offline rendering
+assert(renderingOffline, "This test only supports offline rendering")
+
+print("Recording molecular animation offline - will save as GIF...")
+print("Starting animation loop...")
+
+for frameID in 1...frameCount {
+  // Update time for this frame (60 FPS)
+  currentTime = Float(frameID) / 60.0
+
   modifyAtoms()
   modifyCamera()
 
-  let frameID = application.frameID
-
   // Render and save frames for GIF
   if frameID % gifFrameSkipRate == 0 {
-    var image = application.render()
-    image = application.upscale(image: image)
+    // Debug: print first few atom positions
+    if frameID == 3 {  // Only print for first frame to avoid spam
+      print("Frame \(frameID): checking atoms 0-4")
+      for i in 0..<5 {
+        if let atom = application.atoms[i] {
+          print("  Atom \(i): \(atom.position)")
+        } else {
+          print("  Atom \(i): nil")
+        }
+      }
+    }
+
+    let image = application.render()
 
     // Convert to GIF format
     for y in 0..<gifImage.height {
@@ -202,23 +205,18 @@ application.run {
 
     print("Recorded frame \(frameID / gifFrameSkipRate) / \(frameCount / gifFrameSkipRate)")
   }
+}
 
-  var image = application.render()
-  image = application.upscale(image: image)
-  application.present(image: image)
-
-  // Exit after recording all frames
-  if frameID >= frameCount {
-    print("Encoding GIF...")
-    let data = try! gif.encoded()
-    let filePath = ".build/mm4-molecular-dynamics.gif"
-    let succeeded = FileManager.default.createFile(
-      atPath: filePath,
-      contents: data
-    )
-    if succeeded {
-      print("Saved GIF to \(filePath)")
-    }
-    exit(0)
-  }
+print("Animation complete, \(gif.frames.count) frames recorded")
+print("Encoding GIF...")
+let data = try! gif.encoded()
+let filePath = "Art/molecular-animation.gif"
+let succeeded = FileManager.default.createFile(
+  atPath: filePath,
+  contents: data
+)
+if succeeded {
+  print("Saved GIF to \(filePath)")
+} else {
+  print("Failed to save GIF")
 }

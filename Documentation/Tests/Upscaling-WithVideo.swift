@@ -5,11 +5,21 @@ import MolecularRenderer
 import QuaternionModule
 
 // MARK: - GIF Recording Setup
+let renderingOffline: Bool = true
 let frameCount: Int = 60 * 10  // 10 seconds at 60 FPS
 let gifFrameSkipRate: Int = 3  // Save every 3rd frame for 20 FPS GIF
 
-var gif = GIF()
-var gifImage = GIFModule.Image(width: 1440 * 3, height: 1080 * 3)
+let gifWidth = renderingOffline ? 1440 : 1440 * 3
+let gifHeight = renderingOffline ? 1080 : 1080 * 3
+
+var gif = GIF(
+  width: gifWidth,
+  height: gifHeight,
+  loopCount: 0)
+var gifImage = GIFModule.Image(width: gifWidth, height: gifHeight)
+
+// Global time tracking for offline rendering
+var currentTime: Float = 0
 
 @MainActor
 func createApplication() -> Application {
@@ -19,14 +29,22 @@ func createApplication() -> Application {
 
   var displayDesc = DisplayDescriptor()
   displayDesc.device = device
-  displayDesc.frameBufferSize = SIMD2<Int>(1440, 1080)
-  displayDesc.monitorID = device.fastestMonitorID
+  if renderingOffline {
+    displayDesc.frameBufferSize = SIMD2<Int>(1440, 1080)
+  } else {
+    displayDesc.frameBufferSize = SIMD2<Int>(1440, 1080)
+    displayDesc.monitorID = device.fastestMonitorID
+  }
   let display = Display(descriptor: displayDesc)
 
   var applicationDesc = ApplicationDescriptor()
   applicationDesc.device = device
   applicationDesc.display = display
-  applicationDesc.upscaleFactor = 3
+  if renderingOffline {
+    applicationDesc.upscaleFactor = 1
+  } else {
+    applicationDesc.upscaleFactor = 3
+  }
 
   applicationDesc.addressSpaceSize = 4_000_000
   applicationDesc.voxelAllocationSize = 500_000_000
@@ -73,10 +91,14 @@ func createSilane() -> [SIMD4<Float>] {
 
 @MainActor
 func createTime() -> Float {
-  let elapsedFrames = application.clock.frames
-  let frameRate = application.display.frameRate
-  let seconds = Float(elapsedFrames) / Float(frameRate)
-  return seconds
+  if renderingOffline {
+    return currentTime
+  } else {
+    let elapsedFrames = application.clock.frames
+    let frameRate = application.display.frameRate
+    let seconds = Float(elapsedFrames) / Float(frameRate)
+    return seconds
+  }
 }
 
 @MainActor
@@ -142,63 +164,122 @@ func modifyCamera() {
 
 // MARK: - Main Loop
 
-print("Recording molecular upscaling animation - will save as GIF...")
-application.run {
-  modifyAtoms()
-  modifyCamera()
+if !renderingOffline {
+  print("Recording molecular upscaling animation - will save as GIF...")
+  application.run {
+    modifyAtoms()
+    modifyCamera()
 
-  let frameID = application.frameID
+    let frameID = application.frameID
 
-  // Render and save frames for GIF every few frames
-  if frameID % gifFrameSkipRate == 0 && frameID > 0 {
+    // Render and save frames for GIF every few frames
+    if frameID % gifFrameSkipRate == 0 && frameID > 0 {
+      var image = application.render()
+      image = application.upscale(image: image)
+
+      // Convert to GIF format
+      for y in 0..<gifImage.height {
+        for x in 0..<gifImage.width {
+          let pixelIndex = y * gifImage.width + x
+          let pixel = image.pixels[pixelIndex]
+
+          let r = UInt8(max(0, min(255, Float(pixel.x) * 255)))
+          let g = UInt8(max(0, min(255, Float(pixel.y) * 255)))
+          let b = UInt8(max(0, min(255, Float(pixel.z) * 255)))
+
+          let color = Color(red: r, green: g, blue: b)
+          gifImage[y, x] = color
+        }
+      }
+
+      let frame = Frame(
+        image: gifImage,
+        delayTime: 5, // 20 FPS
+        localQuantization: OctreeQuantization(fromImage: gifImage)
+      )
+      gif.frames.append(frame)
+
+      let progress = frameID / gifFrameSkipRate
+      let total = frameCount / gifFrameSkipRate
+      print("Recorded frame \(progress) / \(total)")
+    }
+
     var image = application.render()
     image = application.upscale(image: image)
+    application.present(image: image)
 
-    // Convert to GIF format
-    for y in 0..<gifImage.height {
-      for x in 0..<gifImage.width {
-        let pixelIndex = y * gifImage.width + x
-        let pixel = image.pixels[pixelIndex]
-
-        let r = UInt8(max(0, min(255, Float(pixel.x) * 255)))
-        let g = UInt8(max(0, min(255, Float(pixel.y) * 255)))
-        let b = UInt8(max(0, min(255, Float(pixel.z) * 255)))
-
-        let color = Color(red: r, green: g, blue: b)
-        gifImage[y, x] = color
+    // Exit after recording all frames
+    if frameID >= frameCount {
+      print("Encoding GIF...")
+      let data = try! gif.encoded()
+      let filePath = "Art/molecular-upscaling-animation.gif"
+      let succeeded = FileManager.default.createFile(
+        atPath: filePath,
+        contents: data
+      )
+      if succeeded {
+        print("Saved GIF to \(filePath)")
+      } else {
+        print("Failed to save GIF")
       }
+      exit(0)
     }
+  }
+} else {
+  print("Recording molecular upscaling animation offline - will save as GIF...")
 
-    let frame = Frame(
-      image: gifImage,
-      delayTime: 5, // 20 FPS
-      localQuantization: OctreeQuantization(fromImage: gifImage)
-    )
-    gif.frames.append(frame)
+  for frameID in 1...frameCount {
+    // Update time for this frame (60 FPS)
+    currentTime = Float(frameID) / 60.0
 
-    let progress = frameID / gifFrameSkipRate
-    let total = frameCount / gifFrameSkipRate
-    print("Recorded frame \(progress) / \(total)")
+    modifyAtoms()
+    modifyCamera()
+
+    // Render and save frames for GIF every few frames
+    if frameID % gifFrameSkipRate == 0 {
+      var image = application.render()
+      if !renderingOffline {
+        image = application.upscale(image: image)
+      }
+
+      // Convert to GIF format
+      for y in 0..<gifImage.height {
+        for x in 0..<gifImage.width {
+          let pixelIndex = y * gifImage.width + x
+          let pixel = image.pixels[pixelIndex]
+
+          let r = UInt8(max(0, min(255, Float(pixel.x) * 255)))
+          let g = UInt8(max(0, min(255, Float(pixel.y) * 255)))
+          let b = UInt8(max(0, min(255, Float(pixel.z) * 255)))
+
+          let color = Color(red: r, green: g, blue: b)
+          gifImage[y, x] = color
+        }
+      }
+
+      let frame = Frame(
+        image: gifImage,
+        delayTime: 5, // 20 FPS
+        localQuantization: OctreeQuantization(fromImage: gifImage)
+      )
+      gif.frames.append(frame)
+
+      let progress = frameID / gifFrameSkipRate
+      let total = frameCount / gifFrameSkipRate
+      print("Recorded frame \(progress) / \(total)")
+    }
   }
 
-  var image = application.render()
-  image = application.upscale(image: image)
-  application.present(image: image)
-
-  // Exit after recording all frames
-  if frameID >= frameCount {
-    print("Encoding GIF...")
-    let data = try! gif.encoded()
-    let filePath = "Art/molecular-upscaling-animation.gif"
-    let succeeded = FileManager.default.createFile(
-      atPath: filePath,
-      contents: data
-    )
-    if succeeded {
-      print("Saved GIF to \(filePath)")
-    } else {
-      print("Failed to save GIF")
-    }
-    exit(0)
+  print("Encoding GIF...")
+  let data = try! gif.encoded()
+  let filePath = "Art/molecular-upscaling-animation.gif"
+  let succeeded = FileManager.default.createFile(
+    atPath: filePath,
+    contents: data
+  )
+  if succeeded {
+    print("Saved GIF to \(filePath)")
+  } else {
+    print("Failed to save GIF")
   }
 }
