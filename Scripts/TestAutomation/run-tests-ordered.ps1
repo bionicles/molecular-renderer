@@ -17,8 +17,10 @@ Set-Location $projectRoot
 $lowAtomTests = @(
     "Upscaling",
     "Upscaling-WithOutput",
+    "Upscaling-Video",
     "OpenMMPlugin",
     "MM4",
+    "MM4-Video",
     "xTB"
     # Note: Propargyl Alcohol Tripod and Stannatrane Tripod require additional files
 )
@@ -265,6 +267,8 @@ if ($completedTests -gt 0) {
     Write-Host ""
     Write-Host "Check for saved outputs in .build folder:" -ForegroundColor Cyan
     Write-Host "  - MDSimulationVideo test saves: Art/diamond-beams-collision-md.gif" -ForegroundColor White
+    Write-Host "  - Upscaling-Video saves: Art/upscaling-molecular-animation.gif" -ForegroundColor White
+    Write-Host "  - MM4-Video saves: Art/mm4-molecular-dynamics.gif" -ForegroundColor White
     Write-Host "  - Upscaling-WithOutput saves: .build/upscaling_frame_*.ppm" -ForegroundColor White
     Write-Host "  - Some tripod tests save: .build/image.ppm" -ForegroundColor White
     Write-Host ""

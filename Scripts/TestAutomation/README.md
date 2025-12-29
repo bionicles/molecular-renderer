@@ -65,8 +65,10 @@ These tests are quick to run and validate basic functionality:
 
 - **Upscaling** - Tests image upscaling functionality
 - **Upscaling-WithOutput** - Saves 5 animation frames to .build/upscaling_frame_*.ppm (runs for 10 seconds)
+- **Upscaling-Video** - Saves 8-second animated GIF of rotating molecules to Art/upscaling-molecular-animation.gif
 - **OpenMMPlugin** - Tests OpenMM plugin loading
 - **MM4** - Tests MM4 force field integration
+- **MM4-Video** - Saves 3-second animated GIF of molecular dynamics to Art/mm4-molecular-dynamics.gif
 - **xTB** - Tests xTB quantum chemistry integration
 
 ### Medium Atom Count (10,000-100,000 atoms)
@@ -107,6 +109,8 @@ These special tests are documented but not included in the automated runners.
 - ✅ **Output-Saving Tests**: Save files to .build/ folder:
   - `Upscaling-WithOutput` → `upscaling_frame_*.ppm` (5 animation frames, 10s runtime)
   - `MDSimulationVideo` → `Art/diamond-beams-collision-md.gif` (animated simulation)
+  - `Upscaling-Video` → `Art/upscaling-molecular-animation.gif` (rotating molecules)
+  - `MM4-Video` → `Art/mm4-molecular-dynamics.gif` (force field dynamics)
   - Some tripod tests → `image.ppm` (static image)
 - ✅ **Build Validation**: All tests compile successfully
 - ✅ **Environment Setup**: Proper OpenMM plugins and threading configured
