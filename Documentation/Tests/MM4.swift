@@ -304,11 +304,18 @@ func modifyCamera() {
 }
 
 // Enter the run loop.
+print("MM4 molecular dynamics test started - window will stay open for 20 seconds...")
 application.run {
   modifyAtoms()
   modifyCamera()
-  
+
   var image = application.render()
   image = application.upscale(image: image)
   application.present(image: image)
+
+  // Exit after 20 seconds (at ~60 FPS = ~1200 frames)
+  if application.frameID >= 1200 {
+    print("Test complete after 20 seconds")
+    exit(0)
+  }
 }

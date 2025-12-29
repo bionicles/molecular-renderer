@@ -8,25 +8,25 @@ func createApplication() -> Application {
   var deviceDesc = DeviceDescriptor()
   deviceDesc.deviceID = Device.fastestDeviceID
   let device = Device(descriptor: deviceDesc)
-  
+
   // Set up the display.
   var displayDesc = DisplayDescriptor()
   displayDesc.device = device
   displayDesc.frameBufferSize = SIMD2<Int>(1440, 1080)
   displayDesc.monitorID = device.fastestMonitorID
   let display = Display(descriptor: displayDesc)
-  
+
   // Set up the application.
   var applicationDesc = ApplicationDescriptor()
   applicationDesc.device = device
   applicationDesc.display = display
   applicationDesc.upscaleFactor = 3
-  
+
   applicationDesc.addressSpaceSize = 4_000_000
   applicationDesc.voxelAllocationSize = 500_000_000
   applicationDesc.worldDimension = 64
   let application = Application(descriptor: applicationDesc)
-  
+
   return application
 }
 let application = createApplication()
@@ -81,7 +81,7 @@ func modifyAtoms() {
   let rotation = Quaternion<Float>(
     angle: Float.pi / 180 * angleDegrees,
     axis: SIMD3(0, 1, 0))
-  
+
   let roundedDownTime = Int((time / 3).rounded(.down))
   if roundedDownTime % 2 == 0 {
     let isopropanol = createIsopropanol()
@@ -90,7 +90,7 @@ func modifyAtoms() {
         application.atoms[atomID] = nil
       }
     }
-    
+
     animationState = .isopropanol
     for i in isopropanol.indices {
       let atomID = 0 + i
@@ -105,7 +105,7 @@ func modifyAtoms() {
         application.atoms[atomID] = nil
       }
     }
-    
+
     animationState = .silane
     for i in silane.indices {
       let atomID = 12 + i
@@ -124,18 +124,68 @@ func modifyCamera() {
   let rotation = Quaternion<Float>(
     angle: Float.pi / 180 * angleDegrees,
     axis: SIMD3(-1, 0, 0))
-  
+
   // Place the camera 1.0 nm away from the origin.
   application.camera.position = rotation.act(on: SIMD3(0, 0, 1.00))
-  
+
   application.camera.basis.0 = rotation.act(on: SIMD3(1, 0, 0))
   application.camera.basis.1 = rotation.act(on: SIMD3(0, 1, 0))
   application.camera.basis.2 = rotation.act(on: SIMD3(0, 0, 1))
   application.camera.fovAngleVertical = Float.pi / 180 * 40
 }
 
-// Enter the run loop.
-print("Upscaling test started - window will stay open for 15 seconds...")
+// Save some frames as PPM images
+import Foundation
+
+@MainActor
+func saveFrame(frameNumber: Int) {
+  print("saveFrame called for frame \(frameNumber)")
+
+  var image = application.render()
+  image = application.upscale(image: image)
+
+  // Get image dimensions - upscaled image should be 3x framebuffer size
+  let width = Int(application.display.frameBufferSize.x * 3)
+  let height = Int(application.display.frameBufferSize.y * 3)
+
+  print("Image dimensions: \(width) x \(height)")
+  print("Pixels count: \(image.pixels.count)")
+
+  // Convert to PPM format
+  var ppmData = "P6\n\(width) \(height)\n255\n"
+  let expectedPixels = width * height
+  print("Expected pixels: \(expectedPixels)")
+
+  for pixelIndex in 0..<min(image.pixels.count, expectedPixels) {
+    let pixel = image.pixels[pixelIndex]
+    // Convert from float [0,1] to byte [0,255]
+    let r = UInt8(max(0, min(255, Float(pixel.x) * 255)))
+    let g = UInt8(max(0, min(255, Float(pixel.y) * 255)))
+    let b = UInt8(max(0, min(255, Float(pixel.z) * 255)))
+    ppmData.append(Character(UnicodeScalar(r)))
+    ppmData.append(Character(UnicodeScalar(g)))
+    ppmData.append(Character(UnicodeScalar(b)))
+  }
+
+  let fileName = ".build/upscaling_frame_\(String(format: "%03d", frameNumber)).ppm"
+  print("Attempting to save to: \(fileName)")
+  do {
+    try ppmData.write(toFile: fileName, atomically: true, encoding: String.Encoding.ascii)
+    print("Successfully saved frame \(frameNumber) to \(fileName)")
+    print("File size: \(ppmData.count) bytes")
+  } catch {
+    print("Failed to save frame \(frameNumber): \(error)")
+  }
+}
+
+// Initialize the scene and save a single frame
+print("Initializing scene and saving frame...")
+modifyAtoms()
+modifyCamera()
+saveFrame(frameNumber: 0)
+
+// Run the interactive window
+print("Starting interactive window - close it manually when done...")
 application.run {
   modifyAtoms()
   modifyCamera()
@@ -143,10 +193,4 @@ application.run {
   var image = application.render()
   image = application.upscale(image: image)
   application.present(image: image)
-
-  // Exit after 15 seconds (at ~60 FPS = ~900 frames)
-  if application.frameID >= 900 {
-    print("Test complete after 15 seconds")
-    exit(0)
-  }
 }
