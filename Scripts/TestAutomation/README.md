@@ -41,6 +41,21 @@ Run a specific test directly:
 .\run-test.ps1 -TestName AccelerationStructure
 ```
 
+## Folder Organization
+
+```
+molecular-renderer/
+├── Scripts/TestAutomation/     # Test automation scripts
+│   ├── README.md              # This documentation
+│   ├── run-test.ps1           # Run individual tests
+│   ├── run-tests-ordered.ps1  # Run tests in order
+│   ├── run-tests.bat          # Interactive test selector
+│   └── run-tests-ordered.bat  # Interactive ordered runner
+├── Documentation/Tests/       # Test source files
+├── Art/                       # Generated outputs (videos, images)
+└── [root wrappers]            # Convenience scripts (run-test.ps1, etc.)
+```
+
 ## Available Tests
 
 Tests are organized by atom count complexity:
