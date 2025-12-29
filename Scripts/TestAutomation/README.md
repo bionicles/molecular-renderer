@@ -65,9 +65,11 @@ These tests are quick to run and validate basic functionality:
 
 - **Upscaling** - Tests image upscaling functionality
 - **Upscaling-WithOutput** - Saves 5 animation frames to .build/upscaling_frame_*.ppm (runs for 10 seconds)
+- **Upscaling-WithVideo** - Creates animated GIF of molecular upscaling (10s animation → Art/molecular-upscaling-animation.gif)
 - **Upscaling-Video** - Saves 8-second animated GIF of rotating molecules to Art/upscaling-molecular-animation.gif
 - **OpenMMPlugin** - Tests OpenMM plugin loading
 - **MM4** - Tests MM4 force field integration
+- **MM4-WithVideo** - Molecular dynamics simulation with thermal motion (3s animation → .build/mm4-molecular-dynamics.gif)
 - **MM4-Video** - Saves 3-second animated GIF of molecular dynamics to Art/mm4-molecular-dynamics.gif
 - **xTB** - Tests xTB quantum chemistry integration
 
@@ -77,6 +79,8 @@ These tests exercise medium-scale molecular structures:
 - **AccelerationStructure** - Tests acceleration structure functionality
 - **CriticalPixelCount** - Tests critical pixel count handling
 - **MDSimulationVideo** - Tests molecular dynamics simulation video generation
+- **MM4-Video** - Creates animated GIF of MM4 molecular dynamics
+- **Upscaling-Video** - Creates animated GIF of molecular upscaling effects
 
 ### High Atom Count (1,000,000-100,000,000 atoms)
 These tests push the limits of the renderer with massive structures:
@@ -106,12 +110,12 @@ These special tests are documented but not included in the automated runners.
 ### Test Results:
 - ✅ **Console Tests** (OpenMMPlugin, xTB): Run automatically and print results
 - ✅ **GUI Tests** (Upscaling, MM4, etc.): Launch interactive molecular visualization windows
-- ✅ **Output-Saving Tests**: Save files to .build/ folder:
-  - `Upscaling-WithOutput` → `upscaling_frame_*.ppm` (5 animation frames, 10s runtime)
-  - `MDSimulationVideo` → `Art/diamond-beams-collision-md.gif` (animated simulation)
-  - `Upscaling-Video` → `Art/upscaling-molecular-animation.gif` (rotating molecules)
-  - `MM4-Video` → `Art/mm4-molecular-dynamics.gif` (force field dynamics)
-  - Some tripod tests → `image.ppm` (static image)
+- ✅ **Output-Saving Tests**: Save files to .build/ and Art/ folders:
+  - `MDSimulationVideo` → `Art/diamond-beams-collision-md.gif` (colliding beams MD)
+  - `Upscaling-WithVideo` → `Art/molecular-upscaling-animation.gif` (rotating molecules)
+  - `MM4-WithVideo` → `.build/mm4-molecular-dynamics.gif` (thermal motion)
+  - `Upscaling-WithOutput` → `.build/upscaling_frame_*.ppm` (static frames)
+  - Some tripod tests → `.build/image.ppm` (static image)
 - ✅ **Build Validation**: All tests compile successfully
 - ✅ **Environment Setup**: Proper OpenMM plugins and threading configured
 - ✅ **Timing**: GUI tests now run for 15-20 seconds for visual inspection

@@ -17,10 +17,10 @@ Set-Location $projectRoot
 $lowAtomTests = @(
     "Upscaling",
     "Upscaling-WithOutput",
-    "Upscaling-Video",
+    "Upscaling-WithVideo",
     "OpenMMPlugin",
     "MM4",
-    "MM4-Video",
+    "MM4-WithVideo",
     "xTB"
     # Note: Propargyl Alcohol Tripod and Stannatrane Tripod require additional files
 )
@@ -28,7 +28,9 @@ $lowAtomTests = @(
 $mediumAtomTests = @(
     "AccelerationStructure",
     "CriticalPixelCount",
-    "MDSimulationVideo"
+    "MDSimulationVideo",
+    "MM4-Video",
+    "Upscaling-Video"
     # Note: MM4 Energy Minimization requires additional files
 )
 
