@@ -91,7 +91,7 @@ These special tests are documented but not included in the automated runners.
 - ✅ **GUI Tests** (Upscaling, MM4, etc.): Launch interactive molecular visualization windows
 - ✅ **Output-Saving Tests**: Save files to .build/ folder:
   - `Upscaling-WithOutput` → `upscaling_frame_*.ppm` (5 animation frames, 10s runtime)
-  - `MDSimulationVideo` → `video.gif` (animated simulation)
+  - `MDSimulationVideo` → `Art/diamond-beams-collision-md.gif` (animated simulation)
   - Some tripod tests → `image.ppm` (static image)
 - ✅ **Build Validation**: All tests compile successfully
 - ✅ **Environment Setup**: Proper OpenMM plugins and threading configured

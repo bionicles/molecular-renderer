@@ -262,7 +262,7 @@ if ($completedTests -gt 0) {
     Write-Host "[SUCCESS] All tests built successfully!" -ForegroundColor Green
     Write-Host ""
     Write-Host "Check for saved outputs in .build folder:" -ForegroundColor Cyan
-    Write-Host "  - MDSimulationVideo test saves: .build/video.gif" -ForegroundColor White
+    Write-Host "  - MDSimulationVideo test saves: Art/diamond-beams-collision-md.gif" -ForegroundColor White
     Write-Host "  - Upscaling-WithOutput saves: .build/upscaling_frame_*.ppm" -ForegroundColor White
     Write-Host "  - Some tripod tests save: .build/image.ppm" -ForegroundColor White
     Write-Host ""

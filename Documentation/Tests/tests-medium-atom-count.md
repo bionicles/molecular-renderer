@@ -75,10 +75,10 @@ Serialize the result to a GIF at 20 FPS. Since GIF only supports times with 0.01
 
 ### macOS
 
-Navigate to the `.build` folder of the repo directory. You may need to press `Cmd + Shift + .` to show hidden files in Finder. Single-click `video.gif`, then press the space bar. This will launch an animated preview of the GIF animation.
+Navigate to the `Art` folder of the repo directory. Single-click `diamond-beams-collision-md.gif`, then press the space bar. This will launch an animated preview of the GIF animation.
 
 Do not double-click the file. If you do this, a Preview window opens with 100 pages. This window does not display an animation.
 
 ### Windows
 
-Double-click `video.gif` in the `.build` folder. Photos automatically launches and displays the animation.
+Double-click `diamond-beams-collision-md.gif` in the `Art` folder. Photos automatically launches and displays the animation.

@@ -515,7 +515,7 @@ if !renderingOffline {
   //
   // Order of magnitude, 1 minute of video is 1 GB of GIF.
   let packagePath = FileManager.default.currentDirectoryPath
-  let filePath = "\(packagePath)/.build/video.gif"
+  let filePath = "\(packagePath)/Art/diamond-beams-collision-md.gif"
   let succeeded = FileManager.default.createFile(
     atPath: filePath,
     contents: data)
