@@ -205,19 +205,39 @@ let beam = createBeam()
 analyze(topology: cross)
 analyze(topology: beam)
 
+func bounds(topology: Topology) -> (SIMD3<Float>, SIMD3<Float>) {
+  var minimum = SIMD3<Float>(repeating: .greatestFiniteMagnitude)
+  var maximum = SIMD3<Float>(repeating: -.greatestFiniteMagnitude)
+  for atom in topology.atoms {
+    let position = atom.position
+    minimum.replace(with: position, where: position .< minimum)
+    maximum.replace(with: position, where: position .> maximum)
+  }
+  return (minimum, maximum)
+}
+
+let crossBounds = bounds(topology: cross)
+let beamBounds = bounds(topology: beam)
+var sceneMin = crossBounds.0
+var sceneMax = crossBounds.1
+sceneMin.replace(with: beamBounds.0, where: beamBounds.0 .< sceneMin)
+sceneMax.replace(with: beamBounds.1, where: beamBounds.1 .> sceneMax)
+
+// Orbit around the geometric center of the full scene (cross + beam).
+let sceneCenter = (sceneMin + sceneMax) / 2
+
+// Choose orbit radius so that at angle = 0, the camera matches the original view.
+let baseCameraPosition = SIMD3<Float>(0, 0, (actualWorldDimension / 2) - 8)
+let orbitRadius = ((baseCameraPosition - sceneCenter) * (baseCameraPosition - sceneCenter)).sum().squareRoot()
+
 // MARK: - Rotation Animation
 
 @MainActor
-func createRotatedBeam(frameID: Int) -> Topology {
-  // 0.5 Hz -> 3 degrees/frame @ 60 Hz
-  //
-  // WARNING: Systems with different display refresh rates may have different
-  // benchmark results. The benchmark should be robust to this variation in
-  // degrees/frame.
-  //
-  // Solution: animate by clock.frames instead of the actual time. On 120 Hz
-  // systems, the benchmark will rotate 2x faster than on 60 Hz systems.
-  let angleDegrees: Float = 3 * Float(frameID)
+func createRotatedBeam(loopFraction: Float, rotationsPerLoop: Int) -> Topology {
+  // Phase-matched looping:
+  // - loopFraction goes from 0 -> 1 over the whole GIF
+  // - rotationsPerLoop is an integer so the start/end phases match exactly
+  let angleDegrees: Float = Float(rotationsPerLoop) * 360 * loopFraction
   let rotation = Quaternion<Float>(
     angle: angleDegrees * Float.pi / 180,
     axis: SIMD3(0, 0, 1))
@@ -297,8 +317,10 @@ for atomID in cross.atoms.indices {
 }
 
 @MainActor
-func addRotatedBeam(frameID: Int) {
-  let rotatedBeam = createRotatedBeam(frameID: frameID)
+func addRotatedBeam(loopFraction: Float, rotationsPerLoop: Int) {
+  let rotatedBeam = createRotatedBeam(
+    loopFraction: loopFraction,
+    rotationsPerLoop: rotationsPerLoop)
   let offset = cross.atoms.count
 
   // Circumvent a massive CPU-side bottleneck from @MainActor referencing to
@@ -319,16 +341,36 @@ assert(renderingOffline, "This test only supports offline rendering")
 print("Recording rotating beam animation offline - will save as GIF...")
 print("Starting animation loop...")
 
-for frameID in 1...frameCount {
-  // Update time for this frame (60 FPS)
-  currentTime = Float(frameID) / 60.0
+// To get a seamless loop WITHOUT a visible “pause”, do NOT include a duplicate
+// endpoint frame. Instead, sample loopFraction over [0, 1) so the wrap from the
+// last frame back to the first has the same phase step as every other frame.
+let recordedFrameCount = frameCount / gifFrameSkipRate
+let orbitRotationsPerLoop: Int = 1
+let beamRotationsPerLoop: Int = 3
 
-  addRotatedBeam(frameID: frameID)
-  application.camera.position = SIMD3(0, 0, (actualWorldDimension / 2) - 8)
+for recordedFrameID in 0..<recordedFrameCount {
+  let loopFraction = Float(recordedFrameID) / Float(recordedFrameCount)
+  currentTime = loopFraction * (Float(frameCount) / 60.0)
 
-  // Render and save frames for GIF every few frames
-  if frameID % gifFrameSkipRate == 0 {
-    let image = application.render()
+  addRotatedBeam(loopFraction: loopFraction, rotationsPerLoop: beamRotationsPerLoop)
+
+  // Orbit the camera around the object (Y-axis orbit; circle in the X-Z plane).
+  let orbitAngle = 2 * Float.pi * Float(orbitRotationsPerLoop) * loopFraction
+  let orbitRotation = Quaternion<Float>(
+    angle: orbitAngle,
+    axis: SIMD3(0, 1, 0))
+
+  let cameraOffset = SIMD3<Float>(0, 0, orbitRadius)
+  application.camera.position = sceneCenter + orbitRotation.act(on: cameraOffset)
+
+  // Camera basis: keep it aligned with the orbit so the camera looks toward the
+  // scene the same way it does in the original test at loopFraction = 0.
+  application.camera.basis.0 = orbitRotation.act(on: SIMD3<Float>(1, 0, 0))
+  application.camera.basis.1 = orbitRotation.act(on: SIMD3<Float>(0, 1, 0))
+  application.camera.basis.2 = orbitRotation.act(on: SIMD3<Float>(0, 0, 1))
+  application.camera.fovAngleVertical = Float.pi / 180 * 60
+
+  let image = application.render()
 
     // Convert to GIF format
     for y in 0..<gifImage.height {
@@ -352,8 +394,7 @@ for frameID in 1...frameCount {
     )
     gif.frames.append(frame)
 
-    print("Recorded frame \(frameID / gifFrameSkipRate) / \(frameCount / gifFrameSkipRate)")
-  }
+  print("Recorded frame \(recordedFrameID + 1) / \(recordedFrameCount)")
 }
 
 print("Animation complete, \(gif.frames.count) frames recorded")
